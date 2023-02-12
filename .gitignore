@@ -1,0 +1,9 @@
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+node_modules
+dist
+
+.vscode/*
+.DS_Store
