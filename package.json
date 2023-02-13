@@ -7,10 +7,10 @@
   "homepage": "https://github.com/mochatek",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mochatek/self-censor.git"
+    "url": "https://github.com/mochatek/SelfCensorJS.git"
   },
   "bugs": {
-    "url": "https://github.com/mochatek/self-censor/issues"
+    "url": "https://github.com/mochatek/SelfCensorJS/issues"
   },
   "keywords": ["movie censoring", "video censoring", "custom censoring"],
   "type": "module",

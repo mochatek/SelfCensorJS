@@ -36,7 +36,11 @@ class SelfCensor {
         if (SelfCensor.#isValidVideo(video)) {
             if (['STALE', 'STOPPED'].includes(this.#state)) {
                 this.#state = 'STARTED';
-                this.#init(video);
+                if (video.readyState === 4) {
+                    this.#init(video);
+                } else {
+                    video.addEventListener('loadedmetadata', () => this.#init(video), { once: true })
+                }
             }
         } else {
             throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
@@ -184,23 +188,26 @@ class SelfCensor {
         entries.forEach(([censorTrack, segments]) => {
             let previousEnd = 0;
         
-            segments.forEach((interval) => {
-                if (interval.length < 2) {
-                    throw new Error(`Invalid interval: ${JSON.stringify(interval)} in track: ${censorTrack}. Missing start/end timestamp`);
+            segments.forEach((segment, index) => {
+                if (segment.length < 2) {
+                    throw new Error(`Invalid segment: ${JSON.stringify(segment)} in track: ${censorTrack}. Missing start/end timestamp`);
                 }
   
                 let start, end;
                 try {
-                    [start, end] = interval.map(Segment.TimeStampToSeconds);
+                    [start, end] = segment.map(Segment.TimeStampToSeconds);
                 } catch (error) {
-                    throw new Error(`${(error as Error).message}, track: ${censorTrack}, segment: ${JSON.stringify(interval)}`);
+                    throw new Error(`${(error as Error).message}, track: ${censorTrack}, segment: ${JSON.stringify(segment)}`);
                 }
   
-                if (previousEnd <= start && start < end ) {
-                    previousEnd = end;
+                if (previousEnd <= start) {
+                    if (start < end) {
+                        previousEnd = end;
+                    } else {
+                        throw new Error(`Invalid segment: ${JSON.stringify(segment)} in track: ${censorTrack}. Start must be < End`);
+                    }
                 } else {
-                    const previousEndTimeStamp = Segment.secondsToTimestamp(previousEnd);
-                    throw new Error(`Corrupted censor data in track: ${censorTrack}, segment: - ${previousEndTimeStamp} -> ${JSON.stringify(interval)}`);
+                    throw new Error(`Corrupted segments: ${JSON.stringify(segments[index-1])} -> ${JSON.stringify(segment)} in track: ${censorTrack}. Segments must be in increasing order`);
                 }
             });
         });
