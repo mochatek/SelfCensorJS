@@ -1,1 +1,1 @@
-export { default as SelfCensor } from './selfCensor';
+export { default } from './selfCensor';

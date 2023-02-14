@@ -1,7 +1,7 @@
 {
   "name": "self-censor",
   "version": "1.0.0",
-  "description": "",
+  "description": "A JavaScript library that provides a simple solution for censoring segments of video in the browser. Define different censor tracks based on categories and switch them on-the-fly.",
   "author": "Akash S Panickar",
   "license": "MIT",
   "homepage": "https://github.com/mochatek",
@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/mochatek/SelfCensorJS/issues"
   },
-  "keywords": ["movie censoring", "video censoring", "custom censoring"],
+  "keywords": ["movie censoring", "video censoring", "custom censoring", "HTML video plugin"],
   "type": "module",
   "main": "./dist/self-censor.umd.cjs",
   "module": "./dist/self-censor.js",
@@ -24,7 +24,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "dev": "vite",

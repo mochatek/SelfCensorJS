@@ -6,7 +6,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'self-censor',
+      name: 'selfCensor',
       fileName: 'self-censor',
     },
   },
