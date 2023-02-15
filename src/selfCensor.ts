@@ -5,8 +5,11 @@ import EventManager from './eventManager';
 type State = 'STALE' | 'STARTED' | 'RUNNING' | 'STOPPED';
 type EventType = 'READY' | 'ERROR';
 type EventObject = { detail: any };
-type CensorData = Record<string, [string, string][]>;
+type CensorData = ConstructorParameters<typeof TimeLine>[0];
 
+/**
+ * API of the library for performing the video censoring
+ */
 class SelfCensor {
     static #allowedEvents = ['ready', 'error'];
   
@@ -17,6 +20,10 @@ class SelfCensor {
     #state: State;
     censorTracks: string[];
   
+    /**
+     * Initializes the censoring service. videoId is the ID of the HTML video element.
+     * If initialized on an invalid video, then it will throw an error.
+     */
     constructor(videoId: string) {
         this.#videoId = videoId
         this.#censorTimeline = null;
@@ -31,22 +38,33 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Validates the target video element and then initializes the censoring service.
+     * If the service is active (STARTED/RUNNING), then calling this method will not have any effect.
+     * Otherwise, it checks the ready state of the video. If it is already loaded, then directly initializes the service.
+     * Otherwise the initialization occurs once after the metadata of the video is loaded. 
+     * If the service was initialized, the state will be set to STARTED.
+     */
     start() {
-        const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
-        if (SelfCensor.#isValidVideo(video)) {
-            if (['STALE', 'STOPPED'].includes(this.#state)) {
+        if (['STALE', 'STOPPED'].includes(this.#state)) {
+            const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
+            if (SelfCensor.#isValidVideo(video)) {
                 this.#state = 'STARTED';
                 if (video.readyState === 4) {
                     this.#init(video);
                 } else {
                     video.addEventListener('loadedmetadata', () => this.#init(video), { once: true })
                 }
+            } else {
+                throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
             }
-        } else {
-            throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
         }
     }
   
+    /**
+     * Stops the censoring service. Removes all the attached listeners.
+     * Free up the internal services and set the state to STOPPED.
+     */
     stop() {
         const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
         if (SelfCensor.#isValidVideo(video)) {
@@ -61,6 +79,17 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Extract the url of the censor file from the data-censor attribute of the video element.
+     * Download and validate the censor data from the censor file.
+     * Initialize the censor timeline as per the current time of the video.
+     * Set the tracks available for the video.
+     * Attach the listeners on the video, which are required for the censoring service.
+     * Set the state to 'RUNNING' and emit the ready event to all registered listeners.
+     * The ready event data will contain the current track name and list of available tracks
+     * on the detail property. If any error occurred during this process, the error event is
+     * emitted if event manager is active, or else throws the error.
+     */
     #init = async (video: HTMLVideoElement) => {
         if (video?.duration) {
             const censorFile = video.dataset['censor']
@@ -91,6 +120,11 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Seeks the censor timeline along with the seeked video time.
+     * This is done only when user seeked the video from the UI.
+     * The forceSeek field will be true whenever the censor service seeks the video time.
+     */
     #seekCensorTimeline = (event: Event) => {
         const video = event.target as HTMLVideoElement;
         if (!this.#forceSeek) {
@@ -100,6 +134,14 @@ class SelfCensor {
         }
     }
   
+    /**
+     * The heart of the library where the censoring actually happens.
+     * Get the current time of the video. Retrieve the current segment from the timeline.
+     * If the current time falls in the current segment, then skip the video to the end of
+     * that segment. Set the forSeek field to true before skipping in order to suppress
+     * the seek event processing (seekCensorTimeline). Advance the timeline to the next segment
+     * after video is skipped.
+     */
     #processFrame = (event: Event) => {
         const video = event.target as HTMLVideoElement;
         const { currentTime } = video;
@@ -112,12 +154,21 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Resets the video and censoring timeline to the beginning.
+     */
     #resetService = (event: Event) => {
         const video = event.target as HTMLVideoElement;
         video.currentTime = 0;
         this.#censorTimeline!.reset();
     }
   
+    /**
+     * Validates the video and switches the censor track to the supplied track
+     * only if such a track is available. Otherwise it results in an error during which
+     * the registered listeners are notified through the 'error' event, if event manager is active.
+     * Otherwise the error is thrown.
+     */
     switchTrack = (track: string) => {
         try {
             if (this.censorTracks.includes(track)) {
@@ -141,6 +192,10 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Registers the listener for the event in th event manager, if that event is allowed.
+     * Instantiates the event manager only if at least one listener is attached.
+     */
     on(event: EventType, handler: (event: EventObject) => any) {
         if (SelfCensor.#allowedEvents.includes(event.toLowerCase())) {
             if (!this.#eventManager) {
@@ -150,6 +205,10 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Un-registers the listener attached to the event, if that event is allowed.
+     * Destroys the event manager if it is inactive after the un-registration.
+     */
     off(event: EventType, handler: (event: EventObject) => any) {
         if (SelfCensor.#allowedEvents.includes(event.toLowerCase())) {
             if (this.#eventManager) {
@@ -161,10 +220,17 @@ class SelfCensor {
         }
     }
   
+    /**
+     * Validates the existence of the target video element in DOM
+     */
     static #isValidVideo(video: HTMLVideoElement) {
         return video && video.constructor.name === 'HTMLVideoElement';
     };
   
+    /**
+     * Downloads the censor data from the source file (JSON).
+     * If the source is invalid or data is not JSON, it will throw error.
+     */
     static #download = async (censorFile: string) => {
         try {
             const response = await fetch(censorFile);
@@ -175,6 +241,14 @@ class SelfCensor {
         }
     };
   
+    /**
+     * Validation for the censor data.
+     *   - Must be a JSON object with at least 1 track and the segments must be an array of intervals.
+     *   - Segment array can be empty meaning no segment is to be skipped in that track.
+     *   - If track is not empty, then all segment in that track must be an interval.
+     *   - Interval must have 2 values and that must be the start and end timestamp, where start < end.
+     *   - Segments in the track must be in increasing order of time.
+     */
     static #validate(censorData: CensorData) {
         if (!(censorData.constructor.name === 'Object')) {
             throw new Error('Invalid censor data format');
@@ -187,6 +261,10 @@ class SelfCensor {
   
         entries.forEach(([censorTrack, segments]) => {
             let previousEnd = 0;
+
+            if (segments.constructor.name !== 'Array') {
+                throw new Error(`Unsupported segments type encountered in track: ${censorTrack}. Segments must be an array of intervals to be skipped`)
+            }
         
             segments.forEach((segment, index) => {
                 if (segment.length < 2) {
