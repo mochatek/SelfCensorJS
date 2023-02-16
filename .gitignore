@@ -4,6 +4,7 @@ pnpm-debug.log*
 
 node_modules
 dist
+lib
 
 .vscode/*
 .DS_Store

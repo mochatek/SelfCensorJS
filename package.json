@@ -14,17 +14,17 @@
   },
   "keywords": ["movie censoring", "video censoring", "custom censoring", "HTML video plugin"],
   "type": "module",
-  "main": "./dist/self-censor.umd.cjs",
-  "module": "./dist/self-censor.js",
-  "types": "./dist/index.d.ts",
+  "main": "./lib/self-censor.umd.cjs",
+  "module": "./lib/self-censor.js",
+  "types": "./lib/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/self-censor.js",
-      "require": "./dist/self-censor.umd.cjs"
+      "import": "./lib/self-censor.js",
+      "require": "./lib/self-censor.umd.cjs"
     }
   },
   "files": [
-    "dist",
+    "lib",
     "README.md"
   ],
   "scripts": {

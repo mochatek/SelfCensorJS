@@ -6,9 +6,10 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'selfCensor',
+      name: 'SelfCensor',
       fileName: 'self-censor',
     },
+    outDir: 'lib',
   },
   plugins: [dts()],
 });
