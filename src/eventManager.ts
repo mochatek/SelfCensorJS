@@ -16,9 +16,13 @@ class EventManager {
   
     /**
      * Manager is active if there is at least one event registered in the table.
+     * An event is active if at least 1 listener is registered for that event
      */
-    get active() {
-        return [...this.#listenerTable.keys()].length > 0
+    isActive(event?: EventName) {
+        if (event) {
+            return this.#listenerTable.has(event);
+        }
+        return [...this.#listenerTable.keys()].length > 0;
     }
   
     /**
@@ -26,9 +30,9 @@ class EventManager {
      */
     register(event: EventName, handler: Handler) {
         if (!this.#listenerTable.has(event)) {
-            this.#listenerTable.set(event, [])
+            this.#listenerTable.set(event, []);
         }
-        this.#listenerTable.get(event)!.push(handler)
+        this.#listenerTable.get(event)!.push(handler);
     }
   
     /**
@@ -38,11 +42,11 @@ class EventManager {
      */
     unregister(event: EventName, handler: Handler) {
         if (this.#listenerTable.has(event)) {
-            const newHandlers = this.#listenerTable.get(event)!.filter((callback) => callback !== handler)
+            const newHandlers = this.#listenerTable.get(event)!.filter((callback) => callback !== handler);
             if (newHandlers.length) {
-                this.#listenerTable.set(event, newHandlers)
+                this.#listenerTable.set(event, newHandlers);
             } else {
-                this.#listenerTable.delete(event)
+                this.#listenerTable.delete(event);
             }
         }
     }
@@ -51,7 +55,7 @@ class EventManager {
      * Method to notify the event to all registered listeners.
      */
     async emit(event: EventName, data: any) {
-        this.#listenerTable.get(event)!.forEach((handler) => handler(data))
+        this.#listenerTable.get(event)!.forEach((handler) => handler(data));
     }
 }
 

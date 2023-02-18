@@ -4,6 +4,8 @@
   <img src="https://github.com/mochatek/SelfCensorJS/blob/main/logo.png" alt="Logo" />
 </p>
 
+[Example](https://github.com/mochatek/SelfCensorJS/tree/main/example) | [Playground](https://mochatek.github.io/SelfCensorJS/example)
+
 __SelfCensorJS__ is a JavaScript library that provides a simple solution for censoring segments of video in the browser. 
 It enables us to define different censor tracks based on age ratings or genres or any other category, and then automatically 
 skip the specified intervals in the video according to the selected track.
@@ -23,7 +25,89 @@ versions of the same movie, based on their preference. They can even add their o
 
 ## Installation
 
+### In Browser:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/self-censor@1.0.0/lib/self-censor.umd.cjs"></script>
+```
+
+### In Node.js environment using NPM:
+
+```
+npm i self-censor
+```
+
 ## Usage
+
+Link the JSON file with censor data:
+
+```html
+<video id="my-video" data-censor="url-of-my-censor-data.json" controls>
+  <source src="url-of-my-video.mp4" type="video/mp4">
+</video>
+```
+
+Import the class:
+
+> In browser, `SelfCensor` will be globally available through the window object, if type is not module.
+
+```js
+// ESM
+import SelfCensor from 'self-censor';
+
+// CommonJS
+const SelfCensor = require('self-censor');
+``` 
+
+Instantiate with the id of the target(HTML Video) element:
+
+```js
+const censor = new SelfCensor('my-video');
+```
+
+Subscribe to `ready` event to get the censor track details:
+
+```js
+censor.on('ready', ({ detail: { censorTracks, currentTrack } }) => console.dir({ censorTracks, currentTrack }))
+```
+
+Subscribe to `error` event to catch and handle the errors thrown from the service:
+
+```js
+censor.on('error', ({ detail }) => console.error(detail));
+```
+
+Start the censoring service:
+
+```js
+censor.start();
+```
+
+Temporarily pause the censoring:
+
+```js
+censor.pause();
+```
+
+Resume a paused service
+
+```js
+censor.resume();
+```
+
+Switch censor track if service is active:
+
+```js
+censor.switchTrack('track-name');
+```
+
+Stop the censoring service:
+
+```js
+censor.stop();
+```
+
+See Example: [Source](https://github.com/mochatek/SelfCensorJS/tree/main/example) | [Playground](https://mochatek.github.io/SelfCensorJS/example)
 
 ## Contributing
 

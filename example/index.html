@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SefCensorJS: Example</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            background-color: hsl(0, 0%, 0%);
+            color: hsl(0, 0%, 100%);
+        }
+        main {
+            max-width: 75vw;
+        }
+        video {
+            width: 100%;
+        }
+        #censor-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #state {
+            background-color: hsla(120, 100%, 25%, 40%);
+            color: hsl(120, 100%, 50%);
+            padding: 0.25rem 2rem;
+            border-radius: 0.25rem;
+        }
+        label {
+            margin-right: 1rem;
+        }
+        @media only screen and (max-width: 700px) {
+            #censor-controls {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <video id="video" controls data-censor="./censor-data.json">
+            <source src="./video.mp4" type="video/mp4">
+        </video>
+
+        <section id="censor-controls">
+            <div id="tracks"></div>
+            <p id="state"></p>
+            <div id="buttons"></div>
+        </section>
+    </main>
+    <script type="module">
+        import SelfCensor from '.https://cdn.jsdelivr.net/npm/self-censor@1.0.0/lib/self-censor.js';
+
+        const censor = new SelfCensor('video')
+
+        const updateState = (state) => {
+            document.getElementById('state').innerText = `State: ${state}`;
+        }
+
+        const addTrackOptions = (censorTracks, currentTrack) => {
+            const tracks = censorTracks.reduce((radioInputs, track) => 
+                `${radioInputs}
+                <label for="${track}"><input type="radio" name="track" id="${track}" value="${track}" ${track == currentTrack? 'checked': ''}> ${track}</label>`
+            , ``)
+            document.getElementById('tracks').insertAdjacentHTML('afterbegin', tracks)
+            document.querySelectorAll('input[name="track"]').forEach(track => 
+                track.addEventListener('change', () => {
+                    const selectedTrack = document.querySelector('input[name="track"]:checked').value
+                    censor.switchTrack(selectedTrack)
+                }
+            ));
+        }
+
+        const addCensorButtons = () => {
+            const censorButtons = `
+            <button id="pause">Pause</button>
+            <button id="resume">Resume</button>
+            <button id="stop">Stop</button>
+            `
+            document.getElementById('buttons').insertAdjacentHTML('beforeend', censorButtons)
+            document.getElementById('pause').addEventListener('click', () => {
+                censor.pause()
+                updateState(censor.state)
+            })
+            document.getElementById('resume').addEventListener('click', () => {
+                censor.resume()
+                updateState(censor.state)
+            })
+            document.getElementById('stop').addEventListener('click', () => {
+                censor.stop()
+                updateState(censor.state)
+            })
+        }
+
+        censor.on('error', (event) => console.error(event.detail))
+
+        censor.on('ready', (event) => {
+            updateState(censor.state)
+
+            const { currentTrack, censorTracks } = event.detail;
+
+            if (censorTracks.length) {
+                addTrackOptions(censorTracks, currentTrack)
+                addCensorButtons()
+            }
+        })
+
+        censor.start()
+    </script>
+</body>
+</html>

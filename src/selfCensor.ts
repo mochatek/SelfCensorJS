@@ -2,7 +2,7 @@ import Segment from './segment';
 import TimeLine from './timeline';
 import EventManager from './eventManager';
 
-type State = 'STALE' | 'STARTED' | 'RUNNING' | 'STOPPED';
+type State = 'STARTED' | 'RUNNING' | 'PAUSED' | 'STOPPED';
 type EventType = 'READY' | 'ERROR';
 type EventObject = { detail: any };
 type CensorData = ConstructorParameters<typeof TimeLine>[0];
@@ -18,7 +18,7 @@ class SelfCensor {
     #eventManager: EventManager | null;
     #forceSeek: boolean;
     #state: State;
-    censorTracks: string[];
+    #censorTracks: string[];
   
     /**
      * Initializes the censoring service. videoId is the ID of the HTML video element.
@@ -29,24 +29,32 @@ class SelfCensor {
         this.#censorTimeline = null;
         this.#eventManager = null;
         this.#forceSeek = false;
-        this.#state = 'STALE';
-        this.censorTracks = [];
+        this.#state = 'STOPPED';
+        this.#censorTracks = [];
     
         const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
         if (!SelfCensor.#isValidVideo(video)) {
             throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
         }
     }
+
+    /**
+     * Returns the current state of the censoring service
+     */
+    get state() {
+        return this.#state;
+    }
   
     /**
-     * Validates the target video element and then initializes the censoring service.
-     * If the service is active (STARTED/RUNNING), then calling this method will not have any effect.
-     * Otherwise, it checks the ready state of the video. If it is already loaded, then directly initializes the service.
-     * Otherwise the initialization occurs once after the metadata of the video is loaded. 
-     * If the service was initialized, the state will be set to STARTED.
+     * Starts the censoring service.
+     * Validates the target video element and then proceed to initialize the censoring service.
+     * Sets state to STARTED.
+     * Checks the ready state of the video. If it is already loaded, then directly initializes the service.
+     * Otherwise the initialization occurs after the metadata of the video is loaded. 
+     * If the service is active (STARTED/RUNNING/PAUSED), then calling this method will not have any effect.
      */
     start() {
-        if (['STALE', 'STOPPED'].includes(this.#state)) {
+        if (this.#state === 'STOPPED') {
             const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
             if (SelfCensor.#isValidVideo(video)) {
                 this.#state = 'STARTED';
@@ -64,17 +72,20 @@ class SelfCensor {
     /**
      * Stops the censoring service. Removes all the attached listeners.
      * Free up the internal services and set the state to STOPPED.
+     * If the service is inactive (STARTED/STOPPED), then calling this method will not have any effect.
      */
     stop() {
-        const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
-        if (SelfCensor.#isValidVideo(video)) {
-            video.removeEventListener('seeked', this.#seekCensorTimeline);
-            video.removeEventListener('timeupdate', this.#processFrame);
-            video.removeEventListener('ended', this.#resetService);
+        if (['RUNNING', 'PAUSED'].includes(this.#state)) {
+            const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
+            if (SelfCensor.#isValidVideo(video)) {
+                video.removeEventListener('seeked', this.#seekCensorTimeline);
+                video.removeEventListener('timeupdate', this.#processFrame);
+                video.removeEventListener('ended', this.#resetService);
+            }
             this.#censorTimeline = null;
             this.#eventManager = null;
             this.#forceSeek = false;
-            this.censorTracks = [];
+            this.#censorTracks = [];
             this.#state = 'STOPPED';
         }
     }
@@ -85,10 +96,9 @@ class SelfCensor {
      * Initialize the censor timeline as per the current time of the video.
      * Set the tracks available for the video.
      * Attach the listeners on the video, which are required for the censoring service.
-     * Set the state to 'RUNNING' and emit the ready event to all registered listeners.
+     * Set the state to 'RUNNING' and emit the ready event from the service.
      * The ready event data will contain the current track name and list of available tracks
-     * on the detail property. If any error occurred during this process, the error event is
-     * emitted if event manager is active, or else throws the error.
+     * on the detail property. If any error occurred during this process, it is emitted from the service.
      */
     #init = async (video: HTMLVideoElement) => {
         if (video?.duration) {
@@ -98,23 +108,17 @@ class SelfCensor {
                     const censorData = await SelfCensor.#download(censorFile);
                     SelfCensor.#validate(censorData);
                     this.#censorTimeline = new TimeLine(censorData, video.currentTime);
-                    this.censorTracks = Object.keys(censorData);
+                    this.#censorTracks = Object.keys(censorData);
                     video.addEventListener('seeked', this.#seekCensorTimeline);
                     video.addEventListener('timeupdate', this.#processFrame);
                     video.addEventListener('ended', this.#resetService);
                     this.#state = 'RUNNING';
-                    this.#eventManager?.emit('ready', {
-                        detail: {
-                            censorTracks: this.censorTracks,
-                            currentTrack: this.#censorTimeline.currentTrack,
-                        },
+                    this.#emit('READY',  {
+                        censorTracks: [...this.#censorTracks],
+                        currentTrack: this.#censorTimeline.currentTrack,
                     });
                 } catch (error) {
-                    if (this.#eventManager?.active) {
-                        this.#eventManager.emit('error', { detail: error });
-                    } else {
-                        throw error;
-                    }
+                    this.#emit('ERROR', error);
                 }
             }
         }
@@ -126,11 +130,13 @@ class SelfCensor {
      * The forceSeek field will be true whenever the censor service seeks the video time.
      */
     #seekCensorTimeline = (event: Event) => {
-        const video = event.target as HTMLVideoElement;
-        if (!this.#forceSeek) {
-            this.#censorTimeline!.seek(video.currentTime);
-        } else {
-            this.#forceSeek = false;
+        if (this.#state === 'RUNNING') {
+            const video = event.target as HTMLVideoElement;
+            if (!this.#forceSeek) {
+                this.#censorTimeline!.seek(video.currentTime);
+            } else {
+                this.#forceSeek = false;
+            }
         }
     }
   
@@ -143,14 +149,16 @@ class SelfCensor {
      * after video is skipped.
      */
     #processFrame = (event: Event) => {
-        const video = event.target as HTMLVideoElement;
-        const { currentTime } = video;
-        const currentSegment = this.#censorTimeline!.currentSegment;
-    
-        if (currentSegment && currentSegment.includes(currentTime)) {
-            this.#forceSeek = true;
-            video.currentTime = currentSegment.end;
-            this.#censorTimeline!.advance();
+        if (this.#state === 'RUNNING') {
+            const video = event.target as HTMLVideoElement;
+            const { currentTime } = video;
+            const currentSegment = this.#censorTimeline!.currentSegment;
+            
+            if (currentSegment && currentSegment.includes(currentTime)) {
+                this.#forceSeek = true;
+                video.currentTime = currentSegment.end;
+                this.#censorTimeline!.advance();
+            }
         }
     }
   
@@ -158,9 +166,36 @@ class SelfCensor {
      * Resets the video and censoring timeline to the beginning.
      */
     #resetService = (event: Event) => {
-        const video = event.target as HTMLVideoElement;
-        video.currentTime = 0;
-        this.#censorTimeline!.reset();
+        if (this.#state === 'RUNNING') {
+            const video = event.target as HTMLVideoElement;
+            video.currentTime = 0;
+            this.#censorTimeline!.reset();
+        }
+    }
+
+    /**
+     * Temporarily pauses censoring it service is active.
+     */
+    pause() {
+        if (this.#state === 'RUNNING') {
+            this.#state = 'PAUSED';
+        }
+    }
+
+    /**
+     * Resumes censoring if it was paused.
+     * While resuming the service, if the target video is invalid, then the service is stopped.
+     */
+    resume() {
+        if (this.#state === 'PAUSED') {
+            const video =  document.getElementById(this.#videoId) as HTMLVideoElement;
+            if (SelfCensor.#isValidVideo(video)) {
+                this.#censorTimeline?.seek(video.currentTime);
+                this.#state = 'RUNNING';
+            } else {
+                this.stop();
+            }
+        }
     }
   
     /**
@@ -168,26 +203,23 @@ class SelfCensor {
      * only if such a track is available. Otherwise it results in an error during which
      * the registered listeners are notified through the 'error' event, if event manager is active.
      * Otherwise the error is thrown.
+     * If the service is inactive (STARTED/STOPPED), then calling this method will not have any effect.
      */
     switchTrack = (track: string) => {
-        try {
-            if (this.censorTracks.includes(track)) {
-                const video = document.getElementById(this.#videoId) as HTMLVideoElement;
-                if (SelfCensor.#isValidVideo(video)) {
-                    this.#censorTimeline!.switch(track, video.currentTime);
+        if (['RUNNING', 'PAUSED'].includes(this.#state)) {
+            try {
+                if (this.#censorTracks.includes(track)) {
+                    const video = document.getElementById(this.#videoId) as HTMLVideoElement;
+                    if (SelfCensor.#isValidVideo(video)) {
+                        this.#censorTimeline!.switch(track, video.currentTime);
+                    } else {
+                        throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
+                    }
                 } else {
-                    throw new Error(`Element with id: ${this.#videoId} is not an HTMLVideoElement, or it doesn't exist`);
+                    throw new Error(`Invalid track. Available tracks are: ${this.#censorTracks}`);
                 }
-            } else {
-                throw new Error(`Invalid track. Available tracks are: ${this.censorTracks}`);
-            }
-        } catch (error) {
-            if (this.#eventManager?.active) {
-                this.#eventManager.emit('error', { 
-                    detail: new Error(`Invalid track. Available tracks are: ${this.censorTracks}`),
-                });
-            } else {
-                throw error;
+            } catch (error) {
+                this.#emit('ERROR', error);
             }
         }
     }
@@ -213,10 +245,28 @@ class SelfCensor {
         if (SelfCensor.#allowedEvents.includes(event.toLowerCase())) {
             if (this.#eventManager) {
                 this.#eventManager.unregister(event, handler);
-                if (!this.#eventManager.active) {
+                if (!this.#eventManager.isActive()) {
                     this.#eventManager = null;
                 }
             }
+        }
+    }
+
+    /**
+     * Wrapper method around the emit method of event manager.
+     * Notifies all registered listeners of the event. Event payload is an object
+     * which contain the data on the details attribute. In case of error event,
+     * the error is thrown if it doesn't have any subscribers.
+     */
+    #emit(event: EventType, detail: any) {
+        if (event === 'ERROR') {
+            if (this.#eventManager?.isActive('error')) {
+                this.#eventManager.emit('error', { detail });
+            } else {
+                throw detail;
+            }
+        } else if (event === 'READY') {
+            this.#eventManager?.emit('ready', { detail });
         }
     }
   
