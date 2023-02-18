@@ -1,6 +1,6 @@
-# This workflow will build the publish the SelfCensorJS package to NPM when a version-tagged commit is pushed
+# This workflow will build the publish the SelfCensor package to NPM when a version-tagged commit is pushed
 
-name: Publish SelfCensorJS distributions to NPM
+name: Publish SelfCensor distributions to NPM
 
 on:
   push:
@@ -20,8 +20,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '14.x'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "14.x"
+          registry-url: "https://registry.npmjs.org"
       - name: Install dependencies and build
         run: npm ci && npm run build
       - name: Publish package to NPM
