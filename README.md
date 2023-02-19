@@ -29,7 +29,7 @@ experience for the user.
 
 ```html
 <script type="module">
-  import SelfCensor from "https://cdn.jsdelivr.net/npm/self-censor@1.0.0/+esm";
+  import SelfCensor from "https://cdn.jsdelivr.net/npm/self-censor@1.0.2/+esm";
 </script>
 ```
 

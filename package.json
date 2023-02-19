@@ -1,6 +1,6 @@
 {
   "name": "self-censor",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A JavaScript library that provides a simple solution for censoring segments of video in the browser. Define different censor tracks based on categories and switch them on-the-fly.",
   "author": "Akash S Panickar",
   "license": "MIT",
