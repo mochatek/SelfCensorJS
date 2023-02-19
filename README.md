@@ -1,4 +1,4 @@
-# SelfCensor.JS
+# SelfCensor.JS  <img src="https://img.shields.io/npm/dm/self-censor" />
 
 <p align="center">
   <img src="https://github.com/mochatek/SelfCensorJS/blob/main/logo.png" alt="Logo" />
